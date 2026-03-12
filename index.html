@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emirates | Global</title>
+<style>
+body{font-family:Arial;margin:0;background:#0b1b2b;color:white}
+header{background:#c8102e;padding:25px;text-align:center;font-size:32px;font-weight:bold}
+.beta{background:#ffcc00;color:black;text-align:center;padding:6px;font-weight:bold}
+nav{background:#09121d;padding:10px;text-align:center}
+nav button{margin:5px;padding:10px 18px;border:none;border-radius:6px;cursor:pointer;font-weight:bold}
+section{padding:25px;max-width:900px;margin:auto}
+.flight{margin:10px 0;padding:15px;border-radius:8px}
+.green{background:#1f7a3f}
+.red{background:#7a1f1f}
+.gray{background:#13283f}
+input, select{padding:8px;margin:5px;border-radius:5px;border:none}
+.admin{margin-top:30px;background:#09121d;padding:15px;border-radius:10px}
+a{color:#4da3ff}
+.ticket{background:#13283f;padding:15px;border-radius:8px;margin:15px 0}
+.ticket p{margin:5px 0}
+button{cursor:pointer}
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+</head>
+<body>
+
+<div class="beta">⚠️ Emirates | Global Website is currently in BETA</div>
+<header>Emirates | Global</header>
+
+<nav>
+<button onclick="showHome()">Home</button>
+<button onclick="showAbout()">About Us</button>
+<button onclick="showFlights()">Flights</button>
+<button onclick="showSocials()">Our Socials</button>
+<button onclick="showBooking()">Book Ticket</button>
+</nav>
+
+<section id="content"></section>
+
+<script>
+const ADMIN_EMAIL = "Proroblox951@gmail.com";
+let flights = [];
+let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+let loggedInEmail = null;
+let gameLink = localStorage.getItem('gameLink') || "";
+let currentPage = "home";
+
+// Real-time listener for flights
+db.ref('flights').on('value', snapshot => {
+  const data = snapshot.val();
+  flights = data ? Object.entries(data).map(([id, f]) => ({ id, ...f })) : [];
+  if(currentPage === "flights" || currentPage === "booking") showFlights();
+});
+
+// Save bookings locally
+function saveBookings(){ localStorage.setItem('bookings', JSON.stringify(bookings)); }
+
+// Cleanup cancelled or ended flights
+function cleanupFlights(){
+  const now = Date.now();
+  flights.forEach(f => {
+    if(f.status==="cancelled" && !f.removeAt) f.removeAt = now + 5*60*1000;
+    if(f.status==="ended" && !f.removeAt) f.removeAt = now + 2*60*1000;
+    if(f.removeAt && now >= f.removeAt) db.ref('flights/'+f.id).remove();
+  });
+}
+setInterval(cleanupFlights, 10000);
+
+// Pages
+function showHome(){
+  currentPage="home";
+  cleanupFlights();
+  const content=document.getElementById('content');
+  let gameButton = gameLink ? `<p><a href="${gameLink}" target="_blank"><button>Play Our Roblox Flight</button></a></p>` : "";
+  content.innerHTML=`<h2>Welcome to Emirates | Global</h2>
+<p>Emirates | Global is a Roblox airline dedicated to providing fun and realistic flight experiences for players.</p>
+<p>Join our flights and become part of the Emirates | Global aviation community.</p>
+${gameButton}`;
+}
+
+function showAbout(){
+  currentPage="about";
+  document.getElementById('content').innerHTML=`<h2>About Emirates | Global</h2>
+<p>Emirates | Global is a community-driven Roblox airline focused on delivering realistic airline operations and enjoyable roleplay events.</p>`;
+}
+
+function showSocials(){
+  currentPage="socials";
+  document.getElementById('content').innerHTML=`<h2>Our Socials</h2>
+<p>Join our community and stay updated with Emirates | Global!</p>
+<p>Discord:</p>
+<a href="https://discord.gg/JYSR7wUJqR" target="_blank">Join Our Discord</a><br><br>
+<p>TikTok:</p>
+<a href="https://www.tiktok.com/@jet2ieu" target="_blank">Follow our TikTok</a>`;
+}
+
+function showBooking(){
+  currentPage="booking";
+  cleanupFlights();
+  const content=document.getElementById('content');
+  if(flights.length===0){ content.innerHTML=`<h2>Book Ticket</h2><p>No flights currently available.</p>`; return; }
+  let options="";
+  flights.forEach(f=>{
+    if(f.status!="cancelled" && f.status!="ended") options+=`<option value='${f.id}'>${f.number} - ${f.date} - ${f.from} to ${f.to}</option>`;
+  });
+  content.innerHTML=`<h2>Book Ticket</h2>
+<select id='flightSelect'>${options}</select><br>
+<input id='passengerName' placeholder='Your Name'><br>
+<button onclick='bookTicket()'>Book Ticket</button>`;
+}
+
+function bookTicket(){
+  const flightId=document.getElementById('flightSelect').value;
+  const name=document.getElementById('passengerName').value;
+  if(!name){ alert('Enter your name'); return; }
+  const f = flights.find(f=>f.id===flightId);
+  const ticket=`<div class='ticket'>
+<p>Passenger: ${name}</p>
+<p>Flight: ${f.number}</p>
+<p>Date: ${f.date}</p>
+<p>From: ${f.from}</p>
+<p>To: ${f.to}</p>
+<p>Time: ${f.time}</p>
+<p><b>Take a picture of this and show it to staff when boarding.</b></p>
+</div>`;
+  bookings.push({name,flight:f.number,date:f.date,time:f.time});
+  saveBookings();
+  document.getElementById('content').innerHTML=`<h2>Booking Confirmed</h2>${ticket}<button onclick='showBooking()'>Book Another Ticket</button>`;
+}
+
+function showFlights(){
+  currentPage="flights";
+  cleanupFlights();
+  const content=document.getElementById('content');
+  let html=`<h2>Available Flights</h2>`;
+  if(flights.length===0){ html+=`<p>There are no flights currently.</p>`; }
+  else flights.forEach(f=>{
+    let colorClass="gray";
+    if(f.status=="active") colorClass="green";
+    if(f.status=="cancelled") colorClass="red";
+    html+=`<div class='flight ${colorClass}'>
+<b>${f.number}</b><br>Date: ${f.date}<br>From: ${f.from}<br>To: ${f.to}<br>Time: ${f.time}<br>Status: ${f.status}`;
+    if(loggedInEmail===ADMIN_EMAIL){
+      if(f.status=="scheduled") html+=`<br><button onclick='startFlight("${f.id}")'>Start Flight</button><button onclick='cancelFlight("${f.id}")'>Cancel Flight</button>`;
+      if(f.status=="active") html+=`<br><button onclick='endFlight("${f.id}")'>End Flight</button>`;
+      html+=`<br><button onclick='deleteFlight("${f.id}")'>Delete Flight</button>`;
+    }
+    html+=`</div>`;
+  });
+  if(loggedInEmail===ADMIN_EMAIL) html+=adminPanel();
+  else html+=`<div class='admin'><h3>Admin Login</h3><input id='emailLogin' placeholder='Enter admin email'><button onclick='loginAdmin()'>Login</button></div>`;
+  content.innerHTML=html;
+}
+
+function adminPanel(){ return `<div class='admin'><h3>Add Flight</h3>
+<input id='num' placeholder='Flight Number'><input id='date' type='date'><input id='from' placeholder='From'><input id='to' placeholder='To'><input id='time' placeholder='Time'><button onclick='addFlight()'>Add Flight</button>
+<h3>Set Roblox Game Link</h3><input id='gameLinkInput' placeholder='Paste Roblox Game Link'><button onclick='saveGameLink()'>Save Game Link</button></div>`; }
+
+function loginAdmin(){ 
+  const email=document.getElementById('emailLogin').value;
+  if(email===ADMIN_EMAIL){ loggedInEmail=email; showFlights(); } 
+  else alert('You are not an admin.');
+}
+
+// Admin flight functions
+function addFlight(){
+  const number=document.getElementById('num').value;
+  const date=document.getElementById('date').value;
+  const from=document.getElementById('from').value;
+  const to=document.getElementById('to').value;
+  const time=document.getElementById('time').value;
+  if(!number||!date||!from||!to||!time){ alert('Fill everything'); return; }
+
+  const newFlightRef = db.ref('flights').push();
+  newFlightRef.set({number,date,from,to,time,status:"scheduled"}, (error)=>{
+    if(error) alert('Error adding flight: '+error);
+    else{
+      document.getElementById('num').value="";
+      document.getElementById('date').value="";
+      document.getElementById('from').value="";
+      document.getElementById('to').value="";
+      document.getElementById('time').value="";
+      alert('Flight created successfully!');
+    }
+  });
+}
+
+function cancelFlight(id){ db.ref('flights/'+id).update({status:"cancelled"}); }
+function startFlight(id){ db.ref('flights/'+id).update({status:"active"}); }
+function endFlight(id){ db.ref('flights/'+id).update({status:"ended"}); }
+function deleteFlight(id){ if(confirm('Delete this flight?')) db.ref('flights/'+id).remove(); }
+
+function saveGameLink(){ 
+  const link=document.getElementById('gameLinkInput').value; 
+  if(!link) return; 
+  gameLink=link; 
+  localStorage.setItem('gameLink',link); 
+  alert('Game link saved!'); 
+}
+
+showHome();
+</script>
+
+</body>
+</html>
